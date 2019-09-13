@@ -44,6 +44,12 @@ module Data.HKD
 , Limit(..)
 ) where
 
+#if MIN_VERSION_base(4,9,0)
+import Data.Kind (Type)
+#else
+#define Type *
+#endif
+
 import Control.Applicative
 import qualified Data.Monoid as Monoid
 import Data.Proxy (Proxy (..))
@@ -81,7 +87,7 @@ type f ~> g = forall a. f a -> g a
 
 -- * FFunctor
 
-class FFunctor t where
+class FFunctor (t :: (k -> Type) -> Type) where
   ffmap :: (f ~> g) -> t f -> t g
 
 instance FFunctor Proxy where
@@ -125,7 +131,7 @@ instance (FFunctor f, FFunctor g) => FFunctor (f :+: g) where
   ffmap f (R1 h) = R1 (ffmap f h)
 #endif
 
-class FFoldable t where
+class FFoldable (t :: (k -> Type) -> Type) where
   ffoldMap :: Monoid.Monoid m => (forall a. f a -> m) -> t f -> m
 
   flengthAcc :: Int -> t f -> Int
@@ -141,7 +147,7 @@ ffor_ :: (FFoldable t, Applicative m) => t f -> (forall a. f a -> m b) -> m ()
 ffor_ tf k = ftraverse_ k tf
 
 instance FFoldable Proxy where
-  ffoldMap _ = mempty
+  ffoldMap _ = Data.Monoid.mempty
   flengthAcc = const
 
 #if MIN_VERSION_base(4,9,0)
@@ -192,7 +198,7 @@ instance (FFoldable f, FFoldable g) => FFoldable (f :+: g) where
 
 -- * FTraversable
 
-class (FFoldable t, FFunctor t) => FTraversable t where
+class (FFoldable t, FFunctor t) => FTraversable (t :: (k -> Type) -> Type) where
   ftraverse :: Applicative m => (forall a. f a -> m (g a)) -> t f -> m (t g)
 ffmapDefault :: FTraversable t =>  (f ~> g) -> t f -> t g
 ffmapDefault k = runIdentity . ftraverse (Identity . k)
@@ -246,7 +252,7 @@ instance (FTraversable f, FTraversable g) => FTraversable (f :+: g) where
 
 -- * FContravariant
 
-class FContravariant t where
+class FContravariant (t :: (k -> Type) -> Type) where
   fcontramap :: (f ~> g) -> t g -> t f
 
 instance FContravariant Proxy where
@@ -297,10 +303,10 @@ instance (FContravariant f, FContravariant g) => FContravariant (f :+: g) where
 
 -- | A logarithm.
 --
--- Recall that '->' is an exponential object. If we take @f = (->) r@, then
+-- Recall that function arrow, @->@ is an exponential object. If we take @f = (->) r@, then
 --
 -- @
--- 'Logarithm' ((->) r) = forall a. (r -> a) -> a = r
+-- 'Logarithm' ((->) r) ≅ forall a. (r -> a) -> a ≅ r
 -- @
 --
 -- and this works for all 'Distributive' / 'Representable' functors.
