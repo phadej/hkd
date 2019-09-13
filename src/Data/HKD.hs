@@ -9,15 +9,17 @@
 {-# language EmptyCase #-}
 #endif
 -- |
--- Copyright :  (c) 2019 Edward Kmett
+-- Copyright :  (c) 2019 Edward Kmett, 2019 Oleg Grenrus
 -- License   :  BSD-2-Clause OR Apache-2.0
--- Maintainer:  Edward Kmett <ekmett@gmail.com>
+-- Maintainer:  Oleg Grenrus <oleg.grenrus@iki.fi>
 -- Stability :  experimental
 -- Portability: non-portable
 --
 -- "Higher-Kinded Data" such as it is
 module Data.HKD
-( type (~>)
+( 
+-- * "Natural" transformation
+   type (~>)
 -- * Functor
 , FFunctor(..)
 -- * Contravariant
@@ -32,14 +34,14 @@ module Data.HKD
 , ffoldMapDefault
 , ffmapDefault
 , ffor
--- * Utilities
+-- * Higher kinded data
+-- | See also "Data.Some" in @some@ package. @hkd@ provides instances for it.
 , Logarithm(..)
 , Tab(..)
 , indexLogarithm
 , Element(..)
 , NT(..)
-, Some(..)
-, Lim(..)
+, Limit(..)
 ) where
 
 import Control.Applicative
@@ -47,10 +49,7 @@ import qualified Data.Monoid as Monoid
 import Data.Proxy (Proxy (..))
 import Data.Functor.Identity (Identity (..))
 
-#if !MIN_VERSION_base(4,13,0)
-import Data.Semigroup (Semigroup (..))
 import Data.Monoid (Monoid (..))
-#endif
 
 -- In older base:s types aren't PolyKinded
 #if MIN_VERSION_base(4,9,0)
@@ -63,6 +62,9 @@ import Data.Functor.Sum (Sum (..))
 #if MIN_VERSION_base(4,10,0)
 import GHC.Generics
 #endif
+
+import Data.Some.GADT (Some (..), mapSome, foldSome)
+import qualified Data.Some.Newtype as N
 
 #if MIN_VERSION_base(4,9,0)
 (#.) :: Coercible b c => (b -> c) -> (a -> b) -> a -> c
@@ -124,7 +126,7 @@ instance (FFunctor f, FFunctor g) => FFunctor (f :+: g) where
 #endif
 
 class FFoldable t where
-  ffoldMap :: Monoid m => (forall a. f a -> m) -> t f -> m
+  ffoldMap :: Monoid.Monoid m => (forall a. f a -> m) -> t f -> m
 
   flengthAcc :: Int -> t f -> Int
   flengthAcc acc t = acc + Monoid.getSum (ffoldMap (\_ -> Monoid.Sum 1) t)
@@ -133,8 +135,7 @@ flength :: FFoldable t => t f -> Int
 flength = flengthAcc 0
 
 ftraverse_ :: (FFoldable t, Applicative m) => (forall a. f a -> m b) -> t f -> m ()
-ftraverse_ k tf = case ffoldMap (Some . k) tf of
-  Some mx -> () <$ mx
+ftraverse_ k tf = N.withSome (ffoldMap (N.mkSome . k) tf) (() <$)
 
 ffor_ :: (FFoldable t, Applicative m) => t f -> (forall a. f a -> m b) -> m ()
 ffor_ tf k = ftraverse_ k tf
@@ -290,8 +291,20 @@ instance (FContravariant f, FContravariant g) => FContravariant (f :+: g) where
   fcontramap f (R1 h) = R1 (fcontramap f h)
 #endif
 
--- * Distributive Utilities
+-------------------------------------------------------------------------------
+-- distributive utilities
+-------------------------------------------------------------------------------
 
+-- | A logarithm.
+--
+-- Recall that '->' is an exponential object. If we take @f = (->) r@, then
+--
+-- @
+-- 'Logarithm' ((->) r) = forall a. (r -> a) -> a = r
+-- @
+--
+-- and this works for all 'Distributive' / 'Representable' functors.
+--
 newtype Logarithm f = Logarithm { runLogarithm :: forall a. f a -> a }
 
 indexLogarithm :: f a -> Logarithm f -> a
@@ -300,13 +313,17 @@ indexLogarithm fa (Logarithm fa2a) = fa2a fa
 instance FContravariant Logarithm where
   fcontramap f g = Logarithm (runLogarithm g . f)
 
+-- | Tabulation.
 newtype Tab a f = Tab { runTab :: Logarithm f -> a }
 
 instance FFunctor (Tab a) where
   ffmap f g = Tab (runTab g . fcontramap f)
 
--- * Elements
+-------------------------------------------------------------------------------
+-- Elements
+-------------------------------------------------------------------------------
 
+-- | Element in @f@
 newtype Element a f = Element { runElement :: f a }
 
 instance FFunctor (Element a) where
@@ -319,38 +336,49 @@ instance FFoldable (Element a) where
 instance FTraversable (Element a) where
   ftraverse f (Element g) = Element <$> f g
 
--- * "natural" transformations via parametricity
+-------------------------------------------------------------------------------
+-- "natural" transformations via parametricity
+-------------------------------------------------------------------------------
 
+-- | Newtyped "natural" transformation
 newtype NT f g = NT (f ~> g)
 
 instance FFunctor (NT f) where
   ffmap f (NT g) = NT (f . g)
 
-data Some m where
-  Some :: m a -> Some m
-
-instance Applicative m => Semigroup (Some m) where
-  Some m <> Some n = Some (m *> n)
-
-instance Applicative m => Monoid (Some m) where
-  mempty = Some (pure ())
-  mappend = (<>)
+-------------------------------------------------------------------------------
+-- Some
+-------------------------------------------------------------------------------
 
 instance FFunctor Some where
-  ffmap f (Some m) = Some (f m)
+  ffmap = mapSome
 
 instance FFoldable Some where
-  ffoldMap f (Some m) = f m
+  ffoldMap = foldSome
   flengthAcc len _ = len + 1
 
 instance FTraversable Some where
   ftraverse f (Some m) = Some <$> f m
 
-newtype Lim f = Lim { runLim :: forall a. f a }
+instance FFunctor N.Some where
+  ffmap = N.mapSome
 
-instance FFunctor Lim where
-  ffmap f (Lim g) = Lim (f g)
+instance FFoldable N.Some where
+  ffoldMap = N.foldSome
+  flengthAcc len _ = len + 1
 
-instance FFoldable Lim where
-  ffoldMap f (Lim g) = f g
+instance FTraversable N.Some where
+  ftraverse f x = N.withSome x $ \x' -> N.mkSome <$> f x'
+
+-------------------------------------------------------------------------------
+-- Limit
+-------------------------------------------------------------------------------
+
+newtype Limit f = Limit { runLimit :: forall a. f a }
+
+instance FFunctor Limit where
+  ffmap f (Limit g) = Limit (f g)
+
+instance FFoldable Limit where
+  ffoldMap f (Limit g) = f g
   flengthAcc len _ = len + 1
