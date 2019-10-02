@@ -1,11 +1,4 @@
 {-# LANGUAGE CPP #-}
-#if !MIN_VERSION_base(4,10,0)
-module Main (main) where
-
-main :: IO ()
-main = return ()
-
-#else
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE KindSignatures #-}
 module Main (
@@ -16,7 +9,11 @@ module Main (
   MyV1,
   ) where
 
+#if MIN_VERSION_base(4,9,0)
 import Data.Kind (Type)
+#else
+#define Type *
+#endif
 
 import GHC.Generics (Generic)
 import Data.HKD
@@ -77,4 +74,3 @@ main = print $ flength
     $ Cons (mkSome (Just 'x'))
     $ Cons (mkSome (Just True))
       Nil
-#endif

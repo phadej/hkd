@@ -1,18 +1,16 @@
-{-# language RankNTypes #-}
-{-# language TypeOperators #-}
-{-# language Trustworthy #-}
-{-# language GADTs #-}
 {-# language CPP #-}
+{-# language FlexibleContexts #-}
+{-# language FlexibleInstances #-}
+{-# language GADTs #-}
+{-# language MultiParamTypeClasses #-}
 {-# language PolyKinds #-}
+{-# language RankNTypes #-}
+{-# language ScopedTypeVariables #-}
+{-# language Trustworthy #-}
+{-# language TypeOperators #-}
 #if !defined(HLINT) && MIN_VERSION_base(4,10,0) && __GLASGOW_HASKELL__ >= 708
 {-# language LambdaCase #-}
 {-# language EmptyCase #-}
-#endif
-#if MIN_VERSION_base(4,10,0)
-{-# language MultiParamTypeClasses #-}
-{-# language FlexibleInstances #-}
-{-# language FlexibleContexts #-}
-{-# language ScopedTypeVariables #-}
 #endif
 -- |
 -- Copyright :  (c) 2019 Edward Kmett, 2019 Oleg Grenrus
@@ -42,10 +40,7 @@ module Data.HKD
 , ffor
 , fsequence
 -- ** Generic derivation
--- | These are available with @base-4.10@ / GHC-8.2 and later.
-#if MIN_VERSION_base(4,10,0)
 , gftraverse
-#endif
 -- * Higher kinded data
 -- | See also "Data.Some" in @some@ package. @hkd@ provides instances for it.
 , Logarithm(..)
@@ -68,6 +63,9 @@ import Data.Proxy (Proxy (..))
 import Data.Functor.Identity (Identity (..))
 import Data.Monoid (Monoid (..))
 
+import GHC.Generics
+import Data.Functor.Confusing
+
 -- In older base:s types aren't PolyKinded
 #if MIN_VERSION_base(4,9,0)
 import Data.Coerce (Coercible, coerce)
@@ -75,12 +73,6 @@ import Data.Functor.Compose (Compose (..))
 import Data.Functor.Product (Product (..))
 import Data.Functor.Sum (Sum (..))
 #endif
-
-#if MIN_VERSION_base(4,10,0)
-import GHC.Generics
-import Data.Functor.Confusing
-#endif
-
 
 import Data.Some.GADT (Some (..), mapSome, foldSome)
 import qualified Data.Some.Newtype as N
@@ -421,7 +413,6 @@ instance FFoldable Limit where
 -- Generic
 -------------------------------------------------------------------------------
 
-#if MIN_VERSION_base(4,10,0)
 -- | Generically derive 'ftraverse'.
 --
 -- Simple usage:
@@ -461,7 +452,7 @@ class GFTraversable1 m f g tf tg where
   gftraverse1 :: (forall a. f a -> m (g a)) -> tf () -> m (tg ())
 
 instance GFTraversable1 m f g V1 V1 where
-  gftraverse1 _ = \case
+  gftraverse1 _ x = x `seq` error "Void is conjured"
   {-# INLINE gftraverse1 #-}
 
 instance (Applicative m, GFTraversable1 m f g x x', GFTraversable1 m f g y y') => GFTraversable1 m f g (x :+: y) (x' :+: y') where
@@ -495,4 +486,3 @@ instance (f ~ f', g ~ g', x ~ x', i ~ R, i' ~ R, Functor m) => GFTraversable2 m 
 instance (f ~ f', g ~ g', t ~ t', i ~ R, i' ~ R, Applicative m, FTraversable t) => GFTraversable2 m f g (K1 i (t f')) (K1 i' (t' g')) where
   gftraverse2 nt = fmap K1 . ftraverse nt . unK1
   {-# INLINE gftraverse2 #-}
-#endif
