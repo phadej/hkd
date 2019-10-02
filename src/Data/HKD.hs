@@ -21,7 +21,7 @@
 --
 -- "Higher-Kinded Data" such as it is
 module Data.HKD
-( 
+(
 -- * "Natural" transformation
    type (~>)
 -- * Functor
@@ -41,6 +41,10 @@ module Data.HKD
 , fsequence
 -- ** Generic derivation
 , gftraverse
+-- * Zip
+, FZip (..)
+-- ** Generic derivation
+, gfzipWith
 -- * Higher kinded data
 -- | See also "Data.Some" in @some@ package. @hkd@ provides instances for it.
 , Logarithm(..)
@@ -89,9 +93,15 @@ infixr 9 #.
 infixr 8 .#
 #endif
 
+-------------------------------------------------------------------------------
+-- wiggly arrow
+-------------------------------------------------------------------------------
+
 type f ~> g = forall a. f a -> g a
 
--- * FFunctor
+-------------------------------------------------------------------------------
+-- FFunctor
+-------------------------------------------------------------------------------
 
 class FFunctor (t :: (k -> Type) -> Type) where
   ffmap :: (f ~> g) -> t f -> t g
@@ -136,6 +146,10 @@ instance (FFunctor f, FFunctor g) => FFunctor (f :+: g) where
   ffmap f (L1 g) = L1 (ffmap f g)
   ffmap f (R1 h) = R1 (ffmap f h)
 #endif
+
+-------------------------------------------------------------------------------
+-- FFoldable
+-------------------------------------------------------------------------------
 
 class FFoldable (t :: (k -> Type) -> Type) where
   ffoldMap :: Monoid.Monoid m => (forall a. f a -> m) -> t f -> m
@@ -202,7 +216,9 @@ instance (FFoldable f, FFoldable g) => FFoldable (f :+: g) where
   flengthAcc acc (R1 g) = flengthAcc acc g
 #endif
 
--- * FTraversable
+-------------------------------------------------------------------------------
+-- FTraversable
+-------------------------------------------------------------------------------
 
 class (FFoldable t, FFunctor t) => FTraversable (t :: (k -> Type) -> Type) where
   ftraverse :: Applicative m => (forall a. f a -> m (g a)) -> t f -> m (t g)
@@ -260,7 +276,36 @@ instance (FTraversable f, FTraversable g) => FTraversable (f :+: g) where
   ftraverse f (R1 h) = R1 <$> ftraverse f h
 #endif
 
--- * FContravariant
+-------------------------------------------------------------------------------
+-- FZip
+-------------------------------------------------------------------------------
+
+class FFunctor t => FZip t where
+    fzipWith :: (forall x. f x -> g x -> h x) -> t f -> t g -> t h
+
+instance FZip (Element a) where
+    fzipWith f (Element x) (Element y) = Element (f x y)
+
+instance FZip (NT f) where
+    fzipWith f (NT g) (NT h) = NT $ \x -> f (g x) (h x)
+
+instance FZip Limit where
+    fzipWith f (Limit x) (Limit y) = Limit (f x y)
+
+#if MIN_VERSION_base(4,9,0)
+instance (FZip f, FZip g) => FZip (Product f g) where
+  fzipWith f (Pair x y) (Pair x' y') = Pair (fzipWith f x x') (fzipWith f y y')
+#endif
+
+#if MIN_VERSION_base(4,10,0)
+instance (FZip f, FZip g) => FZip (f :*: g) where
+  fzipWith f (x :*: y) (x' :*: y') = fzipWith f x x' :*: fzipWith f y y'
+#endif
+
+
+-------------------------------------------------------------------------------
+-- FContravariant
+-------------------------------------------------------------------------------
 
 class FContravariant (t :: (k -> Type) -> Type) where
   fcontramap :: (f ~> g) -> t g -> t f
@@ -410,7 +455,7 @@ instance FFoldable Limit where
   flengthAcc len _ = len + 1
 
 -------------------------------------------------------------------------------
--- Generic
+-- Generic ftraverse
 -------------------------------------------------------------------------------
 
 -- | Generically derive 'ftraverse'.
@@ -424,7 +469,7 @@ instance FFoldable Limit where
 --     , fieldSome   :: 'Some' f
 --     }
 --   deriving ('Generic')
--- 
+--
 -- instance 'FFunctor'     Record where 'ffmap'     = 'ffmapDefault'
 -- instance 'FFoldable'    Record where 'ffoldMap'  = 'ffoldMapDefault'
 -- instance 'FTraversable' Record where 'ftraverse' = 'gftraverse'
@@ -486,3 +531,68 @@ instance (f ~ f', g ~ g', x ~ x', i ~ R, i' ~ R, Functor m) => GFTraversable2 m 
 instance (f ~ f', g ~ g', t ~ t', i ~ R, i' ~ R, Applicative m, FTraversable t) => GFTraversable2 m f g (K1 i (t f')) (K1 i' (t' g')) where
   gftraverse2 nt = fmap K1 . ftraverse nt . unK1
   {-# INLINE gftraverse2 #-}
+
+
+-------------------------------------------------------------------------------
+-- Generic fzipWith
+-------------------------------------------------------------------------------
+
+-- | Generically derive 'fzipWith'.
+--
+-- Simple usage:
+--
+-- @
+-- data Record f = Record
+--     { fieldInt    :: f Int
+--     , fieldString :: f String
+--     }
+--   deriving ('Generic')
+--
+-- instance 'FZip' Record where 'fzipWith' = 'gfzipWith'
+-- @
+
+gfzipWith
+  :: forall t (f :: Type -> Type) (g :: Type -> Type) (h :: Type -> Type). (Generic (t f), Generic (t g), Generic (t h), GFZip f g h (Rep (t f)) (Rep (t g)) (Rep (t h)))
+  => (forall a. f a -> g a -> h a)
+  -> t f
+  -> t g
+  -> t h
+gfzipWith nt x y = to (gfzipWith0 nt (from x) (from y))
+{-# INLINE gfzipWith #-}
+
+class GFZip f g h tf tg th where
+  gfzipWith0 :: (forall a. f a -> g a -> h a) -> tf () -> tg () -> th ()
+
+instance (i0 ~ D, i1 ~ D, i2 ~ D, GFZip1 f g h t0 t1 t2) => GFZip f g h (M1 i0 c0 t0) (M1 i1 c1 t1) (M1 i2 c2 t2) where
+  gfzipWith0 nt x y = M1 (gfzipWith1 nt (unM1 x) (unM1 y))
+  {-# INLINE gfzipWith0 #-}
+
+class GFZip1 f g h tf tg th where
+  gfzipWith1 :: (forall a. f a -> g a -> h a) -> tf () -> tg () -> th ()
+
+instance GFZip1 f g h V1 V1 V1 where
+  gfzipWith1 _ x _ = x `seq` error "Void is conjured"
+
+instance (i0 ~ C, i1 ~ C, i2 ~ C, GFZip2 f g h t0 t1 t2) => GFZip1 f g h (M1 i0 c0 t0) (M1 i1 c1 t1) (M1 i2 c2 t2) where
+  gfzipWith1 nt x y = M1 (gfzipWith2 nt (unM1 x) (unM1 y))
+  {-# INLINE gfzipWith1 #-}
+
+class GFZip2 f g h tf tg th where
+  gfzipWith2 :: (forall a. f a -> g a -> h a) -> tf () -> tg () -> th ()
+
+instance GFZip2 f g h U1 U1 U1 where
+  gfzipWith2 _ _ _ = U1
+
+instance (GFZip2 f g h tf tg th, GFZip2 f g h sf sg sh) => GFZip2 f g h (tf :*: sf) (tg :*: sg) (th :*: sh) where
+  gfzipWith2 nt (x :*: y) (x' :*: y') = gfzipWith2 nt x x' :*: gfzipWith2 nt y y'
+  {-# INLINE gfzipWith2 #-}
+
+instance (i0 ~ S, i1 ~ S, i2 ~ S, GFZip2 f g h t0 t1 t2) => GFZip2 f g h (M1 i0 c0 t0) (M1 i1 c1 t1) (M1 i2 c2 t2) where
+  gfzipWith2 nt x y = M1 (gfzipWith2 nt (unM1 x) (unM1 y))
+  {-# INLINE gfzipWith2 #-}
+
+instance (f ~ f', g ~ g', h ~ h', x0 ~ x1, x1 ~ x2, i0 ~ R, i1 ~ R, i2 ~ R) => GFZip2 f g h (K1 i0 (f' x0)) (K1 i1 (g' x1)) (K1 i2 (h' x2)) where
+  gfzipWith2 nt (K1 x) (K1 y) = K1 (nt x y)
+
+instance (f ~ f', g ~ g', h ~ h', t0 ~ t1, t1 ~ t2, i0 ~ R, i1 ~ R, i2 ~ R, FZip t0) => GFZip2 f g h (K1 i0 (t0 f')) (K1 i1 (t1 g')) (K1 i2 (t2 h')) where
+  gfzipWith2 nt (K1 x) (K1 y) = K1 (fzipWith nt x y)
