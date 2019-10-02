@@ -47,6 +47,9 @@ library
   ghc-options:      -Wall
   exposed-modules:  Data.HKD
 
+  if impl(ghc >=7.10)
+    other-modules: Data.Functor.Confusing
+
   if impl(ghc >=8.0)
     ghc-options: -Wno-trustworthy-safe
 
@@ -68,8 +71,6 @@ library
   if !impl(ghc >=7.8)
     build-depends: tagged >=0.8.5 && <1
 
-  build-depends:    some
-
 test-suite example-np
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
@@ -79,3 +80,18 @@ test-suite example-np
   build-depends:
     , base
     , hkd
+
+test-suite example-record
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  ghc-options:      -Wall
+  hs-source-dirs:   example
+  main-is:          Record.hs
+
+  -- build-depends: dump-core
+  -- ghc-options:   -fplugin=DumpCore
+
+  build-depends:
+    , base
+    , hkd
+    , some
