@@ -22,12 +22,15 @@ import Data.Some (Some, mkSome)
 data Record f = Record
     { fieldInt    :: f Int
     , fieldString :: f String
+    , fieldSome   :: Element Int f
     }
   deriving (Generic)
 
 instance FFunctor     Record where ffmap     = ffmapDefault
 instance FFoldable    Record where ffoldMap  = ffoldMapDefault
 instance FTraversable Record where ftraverse = gftraverse
+
+instance FZip         Record where fzipWith  = gfzipWith
 
 -------------------------------------------------------------------------------
 -- Sum
@@ -51,9 +54,13 @@ instance FFunctor     MyU1 where ffmap     = ffmapDefault
 instance FFoldable    MyU1 where ffoldMap  = ffoldMapDefault
 instance FTraversable MyU1 where ftraverse = gftraverse
 
+instance FZip         MyU1 where fzipWith  = gfzipWith
+
 instance FFunctor     MyV1 where ffmap     = ffmapDefault
 instance FFoldable    MyV1 where ffoldMap  = ffoldMapDefault
 instance FTraversable MyV1 where ftraverse = gftraverse
+
+instance FZip         MyV1 where fzipWith  = gfzipWith
 
 -------------------------------------------------------------------------------
 -- Interesting
