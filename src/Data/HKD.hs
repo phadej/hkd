@@ -40,6 +40,7 @@ module Data.HKD
 , ffoldMapDefault
 , ffmapDefault
 , ffor
+, fsequence
 -- ** Generic derivation
 -- | These are available with @base-4.10@ / GHC-8.2 and later.
 #if MIN_VERSION_base(4,10,0)
@@ -221,6 +222,9 @@ ffoldMapDefault k = getConst . ftraverse (Const . k)
 
 ffor :: (FTraversable t, Applicative m) => t f -> (forall a. f a -> m (g a)) -> m (t g)
 ffor tf k = ftraverse k tf
+
+fsequence :: (FTraversable t, Applicative f) => t f -> f (t Identity)
+fsequence = ftraverse (fmap Identity)
 
 instance FTraversable Proxy where
   ftraverse _ Proxy = pure Proxy
