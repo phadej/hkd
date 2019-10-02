@@ -31,6 +31,7 @@ instance FFoldable    Record where ffoldMap  = ffoldMapDefault
 instance FTraversable Record where ftraverse = gftraverse
 
 instance FZip         Record where fzipWith  = gfzipWith
+instance FRepeat      Record where frepeat   = gfrepeat
 
 -------------------------------------------------------------------------------
 -- Sum
@@ -55,6 +56,7 @@ instance FFoldable    MyU1 where ffoldMap  = ffoldMapDefault
 instance FTraversable MyU1 where ftraverse = gftraverse
 
 instance FZip         MyU1 where fzipWith  = gfzipWith
+instance FRepeat      MyU1 where frepeat   = gfrepeat
 
 instance FFunctor     MyV1 where ffmap     = ffmapDefault
 instance FFoldable    MyV1 where ffoldMap  = ffoldMapDefault
