@@ -8,6 +8,9 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
+#if __GLASGOW_HASKELL__ <800
+{-# LANGUAGE UndecidableInstances #-}
+#endif
 module Main where
 
 #if MIN_VERSION_base(4,9,0)
