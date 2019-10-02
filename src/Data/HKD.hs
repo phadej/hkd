@@ -41,10 +41,12 @@ module Data.HKD
 , fsequence
 -- ** Generic derivation
 , gftraverse
--- * Zip
+-- * Zip & Repeat
 , FZip (..)
+, FRepeat (..)
 -- ** Generic derivation
 , gfzipWith
+, gfrepeat
 -- * Higher kinded data
 -- | See also "Data.Some" in @some@ package. @hkd@ provides instances for it.
 , Logarithm(..)
@@ -283,23 +285,41 @@ instance (FTraversable f, FTraversable g) => FTraversable (f :+: g) where
 class FFunctor t => FZip t where
     fzipWith :: (forall x. f x -> g x -> h x) -> t f -> t g -> t h
 
+class FZip t => FRepeat t where
+    frepeat :: (forall x. f x) -> t f
+
 instance FZip (Element a) where
     fzipWith f (Element x) (Element y) = Element (f x y)
+
+instance FRepeat (Element a) where
+    frepeat x = Element x
 
 instance FZip (NT f) where
     fzipWith f (NT g) (NT h) = NT $ \x -> f (g x) (h x)
 
+instance FRepeat (NT a) where
+    frepeat x = NT $ \_ -> x
+
 instance FZip Limit where
     fzipWith f (Limit x) (Limit y) = Limit (f x y)
+
+instance FRepeat Limit where
+    frepeat x = Limit x
 
 #if MIN_VERSION_base(4,9,0)
 instance (FZip f, FZip g) => FZip (Product f g) where
   fzipWith f (Pair x y) (Pair x' y') = Pair (fzipWith f x x') (fzipWith f y y')
+
+instance (FRepeat f, FRepeat g) => FRepeat (Product f g) where
+  frepeat x = Pair (frepeat x) (frepeat x)
 #endif
 
 #if MIN_VERSION_base(4,10,0)
 instance (FZip f, FZip g) => FZip (f :*: g) where
   fzipWith f (x :*: y) (x' :*: y') = fzipWith f x x' :*: fzipWith f y y'
+
+instance (FRepeat f, FRepeat g) => FRepeat (f :*: g) where
+  frepeat x = frepeat x :*: frepeat x
 #endif
 
 
@@ -548,7 +568,8 @@ instance (f ~ f', g ~ g', t ~ t', i ~ R, i' ~ R, Applicative m, FTraversable t) 
 --     }
 --   deriving ('Generic')
 --
--- instance 'FZip' Record where 'fzipWith' = 'gfzipWith'
+-- instance 'FZip'    Record where 'fzipWith' = 'gfzipWith'
+-- instance 'FRepeat' Record where 'frepeat'  = 'gfrepeat'
 -- @
 
 gfzipWith
@@ -596,3 +617,43 @@ instance (f ~ f', g ~ g', h ~ h', x0 ~ x1, x1 ~ x2, i0 ~ R, i1 ~ R, i2 ~ R) => G
 
 instance (f ~ f', g ~ g', h ~ h', t0 ~ t1, t1 ~ t2, i0 ~ R, i1 ~ R, i2 ~ R, FZip t0) => GFZip2 f g h (K1 i0 (t0 f')) (K1 i1 (t1 g')) (K1 i2 (t2 h')) where
   gfzipWith2 nt (K1 x) (K1 y) = K1 (fzipWith nt x y)
+
+-------------------------------------------------------------------------------
+-- Generic frepeat
+-------------------------------------------------------------------------------
+
+gfrepeat
+  :: forall t (f :: Type -> Type). (Generic (t f), GFRepeat f (Rep (t f)))
+  => (forall x. f x)
+  -> t f
+gfrepeat x = to (gfrepeat0 x)
+
+class GFRepeat f tf where
+  gfrepeat0 :: (forall a. f a) -> tf ()
+
+instance (i ~ D, GFRepeat1 g f) => GFRepeat g (M1 i c f) where
+  gfrepeat0 x = M1 (gfrepeat1 x)
+
+class GFRepeat1 f tf where
+  gfrepeat1 :: (forall a. f a) -> tf ()
+
+instance (i ~ C, GFRepeat2 g f) => GFRepeat1 g (M1 i c f) where
+  gfrepeat1 x = M1 (gfrepeat2 x)
+
+class GFRepeat2 f tf where
+  gfrepeat2 :: (forall a. f a) -> tf ()
+
+instance (i ~ S, GFRepeat2 g f) => GFRepeat2 g (M1 i c f) where
+  gfrepeat2 x = M1 (gfrepeat2 x)
+
+instance (GFRepeat2 f x, GFRepeat2 f y) => GFRepeat2 f (x :*: y) where
+  gfrepeat2 x = gfrepeat2 x :*: gfrepeat2 x
+
+instance GFRepeat2 f U1 where
+  gfrepeat2 _ = U1
+
+instance (i ~ R, f ~ f') => GFRepeat2 f (K1 i (f' x)) where
+  gfrepeat2 x = K1 x
+
+instance (i ~ R, f ~ f', FRepeat t) => GFRepeat2 f (K1 i (t f')) where
+  gfrepeat2 x = K1 (frepeat x)
