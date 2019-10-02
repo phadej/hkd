@@ -1,9 +1,13 @@
-{-# language RankNTypes #-}
-{-# language TypeOperators #-}
-{-# language Trustworthy #-}
-{-# language GADTs #-}
 {-# language CPP #-}
+{-# language FlexibleContexts #-}
+{-# language FlexibleInstances #-}
+{-# language GADTs #-}
+{-# language MultiParamTypeClasses #-}
 {-# language PolyKinds #-}
+{-# language RankNTypes #-}
+{-# language ScopedTypeVariables #-}
+{-# language Trustworthy #-}
+{-# language TypeOperators #-}
 #if !defined(HLINT) && MIN_VERSION_base(4,10,0) && __GLASGOW_HASKELL__ >= 708
 {-# language LambdaCase #-}
 {-# language EmptyCase #-}
@@ -31,9 +35,12 @@ module Data.HKD
 , ffor_
 -- * Traversable
 , FTraversable(..)
-, ffoldMapDefault
 , ffmapDefault
+, ffoldMapDefault
 , ffor
+, fsequence
+-- ** Generic derivation
+, gftraverse
 -- * Higher kinded data
 -- | See also "Data.Some" in @some@ package. @hkd@ provides instances for it.
 , Logarithm(..)
@@ -54,8 +61,10 @@ import Control.Applicative
 import qualified Data.Monoid as Monoid
 import Data.Proxy (Proxy (..))
 import Data.Functor.Identity (Identity (..))
-
 import Data.Monoid (Monoid (..))
+
+import GHC.Generics
+import Data.Functor.Confusing
 
 -- In older base:s types aren't PolyKinded
 #if MIN_VERSION_base(4,9,0)
@@ -65,12 +74,9 @@ import Data.Functor.Product (Product (..))
 import Data.Functor.Sum (Sum (..))
 #endif
 
-#if MIN_VERSION_base(4,10,0)
-import GHC.Generics
-#endif
-
 import Data.Some.GADT (Some (..), mapSome, foldSome)
 import qualified Data.Some.Newtype as N
+import qualified Data.Some.Church as C
 
 #if MIN_VERSION_base(4,9,0)
 (#.) :: Coercible b c => (b -> c) -> (a -> b) -> a -> c
@@ -200,6 +206,7 @@ instance (FFoldable f, FFoldable g) => FFoldable (f :+: g) where
 
 class (FFoldable t, FFunctor t) => FTraversable (t :: (k -> Type) -> Type) where
   ftraverse :: Applicative m => (forall a. f a -> m (g a)) -> t f -> m (t g)
+
 ffmapDefault :: FTraversable t =>  (f ~> g) -> t f -> t g
 ffmapDefault k = runIdentity . ftraverse (Identity . k)
 
@@ -208,6 +215,9 @@ ffoldMapDefault k = getConst . ftraverse (Const . k)
 
 ffor :: (FTraversable t, Applicative m) => t f -> (forall a. f a -> m (g a)) -> m (t g)
 ffor tf k = ftraverse k tf
+
+fsequence :: (FTraversable t, Applicative f) => t f -> f (t Identity)
+fsequence = ftraverse (fmap Identity)
 
 instance FTraversable Proxy where
   ftraverse _ Proxy = pure Proxy
@@ -347,7 +357,7 @@ instance FTraversable (Element a) where
 -------------------------------------------------------------------------------
 
 -- | Newtyped "natural" transformation
-newtype NT f g = NT (f ~> g)
+newtype NT f g = NT { runNT :: f ~> g }
 
 instance FFunctor (NT f) where
   ffmap f (NT g) = NT (f . g)
@@ -376,6 +386,16 @@ instance FFoldable N.Some where
 instance FTraversable N.Some where
   ftraverse f x = N.withSome x $ \x' -> N.mkSome <$> f x'
 
+instance FFunctor C.Some where
+  ffmap = C.mapSome
+
+instance FFoldable C.Some where
+  ffoldMap = C.foldSome
+  flengthAcc len _ = len + 1
+
+instance FTraversable C.Some where
+  ftraverse f x = C.withSome x $ \x' -> C.mkSome <$> f x'
+
 -------------------------------------------------------------------------------
 -- Limit
 -------------------------------------------------------------------------------
@@ -388,3 +408,81 @@ instance FFunctor Limit where
 instance FFoldable Limit where
   ffoldMap f (Limit g) = f g
   flengthAcc len _ = len + 1
+
+-------------------------------------------------------------------------------
+-- Generic
+-------------------------------------------------------------------------------
+
+-- | Generically derive 'ftraverse'.
+--
+-- Simple usage:
+--
+-- @
+-- data Record f = Record
+--     { fieldInt    :: f Int
+--     , fieldString :: f String
+--     , fieldSome   :: 'Some' f
+--     }
+--   deriving ('Generic')
+-- 
+-- instance 'FFunctor'     Record where 'ffmap'     = 'ffmapDefault'
+-- instance 'FFoldable'    Record where 'ffoldMap'  = 'ffoldMapDefault'
+-- instance 'FTraversable' Record where 'ftraverse' = 'gftraverse'
+-- @
+
+gftraverse
+  :: forall t (f :: Type -> Type) (g :: Type -> Type) m. (Applicative m, Generic (t f), Generic (t g), GFTraversable (Curried (Yoneda m)) f g (Rep (t f)) (Rep (t g)))
+  => (forall a. f a -> m (g a))
+  -> t f
+  -> m (t g)
+gftraverse = fconfusing impl
+  where
+  impl :: FLensLike (Curried (Yoneda m)) (t f) (t g) f g
+  impl nt = fmap to . gftraverse0 nt . from
+{-# INLINE gftraverse #-}
+
+class GFTraversable m f g tf tg where
+  gftraverse0 :: (forall a. f a -> m (g a)) -> tf () -> m (tg ())
+
+instance (i ~ D, i' ~ D, Functor m, GFTraversable1 m f g h h') => GFTraversable m f g (M1 i c h) (M1 i' c' h') where
+  gftraverse0 nt = fmap M1 . gftraverse1 nt . unM1
+  {-# INLINE gftraverse0 #-}
+
+class GFTraversable1 m f g tf tg where
+  gftraverse1 :: (forall a. f a -> m (g a)) -> tf () -> m (tg ())
+
+instance GFTraversable1 m f g V1 V1 where
+  gftraverse1 _ x = x `seq` error "Void is conjured"
+  {-# INLINE gftraverse1 #-}
+
+instance (Applicative m, GFTraversable1 m f g x x', GFTraversable1 m f g y y') => GFTraversable1 m f g (x :+: y) (x' :+: y') where
+  gftraverse1 nt (L1 x) = fmap L1 (gftraverse1 nt x)
+  gftraverse1 nt (R1 y) = fmap R1 (gftraverse1 nt y)
+  {-# INLINE gftraverse1 #-}
+
+instance (i ~ C, i' ~ C, Functor m, GFTraversable2 m f g h h') => GFTraversable1 m f g (M1 i c h) (M1 i' c' h') where
+  gftraverse1 nt = fmap M1 . gftraverse2 nt . unM1
+  {-# INLINE gftraverse1 #-}
+
+class GFTraversable2 m f g tf tg where
+  gftraverse2 :: (forall a. f a -> m (g a)) -> tf () -> m (tg ())
+
+instance Applicative m  => GFTraversable2 m f g U1 U1 where
+  gftraverse2 _ _ = pure U1
+  {-# INLINE gftraverse2 #-}
+
+instance (i ~ S, i' ~ S, Functor m, GFTraversable2 m f g h h') => GFTraversable2 m f g (M1 i c h) (M1 i' c' h') where
+  gftraverse2 nt = fmap M1 . gftraverse2 nt . unM1
+  {-# INLINE gftraverse2 #-}
+
+instance (Applicative m, GFTraversable2 m f g x x', GFTraversable2 m f g y y') => GFTraversable2 m f g (x :*: y) (x' :*: y') where
+  gftraverse2 nt (x :*: y) = liftA2 (:*:) (gftraverse2 nt x) (gftraverse2 nt y)
+  {-# INLINE gftraverse2 #-}
+
+instance (f ~ f', g ~ g', x ~ x', i ~ R, i' ~ R, Functor m) => GFTraversable2 m f g (K1 i (f' x)) (K1 i' (g' x')) where
+  gftraverse2 nt = fmap K1 . nt . unK1
+  {-# INLINE gftraverse2 #-}
+
+instance (f ~ f', g ~ g', t ~ t', i ~ R, i' ~ R, Applicative m, FTraversable t) => GFTraversable2 m f g (K1 i (t f')) (K1 i' (t' g')) where
+  gftraverse2 nt = fmap K1 . ftraverse nt . unK1
+  {-# INLINE gftraverse2 #-}
