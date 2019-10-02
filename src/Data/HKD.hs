@@ -37,8 +37,8 @@ module Data.HKD
 , ffor_
 -- * Traversable
 , FTraversable(..)
-, ffoldMapDefault
 , ffmapDefault
+, ffoldMapDefault
 , ffor
 , fsequence
 -- ** Generic derivation
@@ -84,6 +84,7 @@ import Data.Functor.Confusing
 
 import Data.Some.GADT (Some (..), mapSome, foldSome)
 import qualified Data.Some.Newtype as N
+import qualified Data.Some.Church as C
 
 #if MIN_VERSION_base(4,9,0)
 (#.) :: Coercible b c => (b -> c) -> (a -> b) -> a -> c
@@ -364,7 +365,7 @@ instance FTraversable (Element a) where
 -------------------------------------------------------------------------------
 
 -- | Newtyped "natural" transformation
-newtype NT f g = NT (f ~> g)
+newtype NT f g = NT { runNT :: f ~> g }
 
 instance FFunctor (NT f) where
   ffmap f (NT g) = NT (f . g)
@@ -393,6 +394,16 @@ instance FFoldable N.Some where
 instance FTraversable N.Some where
   ftraverse f x = N.withSome x $ \x' -> N.mkSome <$> f x'
 
+instance FFunctor C.Some where
+  ffmap = C.mapSome
+
+instance FFoldable C.Some where
+  ffoldMap = C.foldSome
+  flengthAcc len _ = len + 1
+
+instance FTraversable C.Some where
+  ftraverse f x = C.withSome x $ \x' -> C.mkSome <$> f x'
+
 -------------------------------------------------------------------------------
 -- Limit
 -------------------------------------------------------------------------------
@@ -419,6 +430,7 @@ instance FFoldable Limit where
 -- data Record f = Record
 --     { fieldInt    :: f Int
 --     , fieldString :: f String
+--     , fieldSome   :: 'Some' f
 --     }
 --   deriving ('Generic')
 -- 

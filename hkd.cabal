@@ -59,8 +59,8 @@ library
       -Wredundant-constraints -Widentities -Wmissing-export-lists
 
   build-depends:
-    , base  >=4.6 && <4.14
-    , some  ^>=1
+    , base  >=4.6     && <4.14
+    , some  ^>=1.0.0.3
 
   if !impl(ghc >=7.10)
     build-depends: transformers >=0.3 && <0.6
