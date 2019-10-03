@@ -312,6 +312,13 @@ instance (FZip f, FZip g) => FZip (Product f g) where
 
 instance (FRepeat f, FRepeat g) => FRepeat (Product f g) where
   frepeat x = Pair (frepeat x) (frepeat x)
+
+-- | We only need an 'Apply' part of an 'Applicative'.
+instance (Applicative f, FZip g) => FZip (Compose f g) where
+  fzipWith f (Compose x) (Compose y) = Compose (liftA2 (fzipWith f) x y)
+
+instance (Applicative f, FRepeat g) => FRepeat (Compose f g) where
+  frepeat x = Compose (pure (frepeat x))
 #endif
 
 #if MIN_VERSION_base(4,10,0)
@@ -320,6 +327,13 @@ instance (FZip f, FZip g) => FZip (f :*: g) where
 
 instance (FRepeat f, FRepeat g) => FRepeat (f :*: g) where
   frepeat x = frepeat x :*: frepeat x
+
+-- | We only need an 'Apply' part of an 'Applicative'.
+instance (Applicative f, FZip g) => FZip (f :.: g) where
+  fzipWith f (Comp1 x) (Comp1 y) = Comp1 (liftA2 (fzipWith f) x y)
+
+instance (Applicative f, FRepeat g) => FRepeat (f :.: g) where
+  frepeat x = Comp1 (pure (frepeat x))
 #endif
 
 
