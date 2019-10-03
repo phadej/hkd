@@ -65,6 +65,7 @@ import Data.Kind (Type)
 
 import Control.Applicative
 import qualified Data.Monoid as Monoid
+import Data.Semigroup (Semigroup (..))
 import Data.Proxy (Proxy (..))
 import Data.Functor.Identity (Identity (..))
 import Data.Monoid (Monoid (..))
@@ -288,6 +289,12 @@ class FFunctor t => FZip t where
 class FZip t => FRepeat t where
     frepeat :: (forall x. f x) -> t f
 
+instance FZip Proxy where
+    fzipWith _ _ _ = Proxy
+
+instance FRepeat Proxy where
+    frepeat _ = Proxy
+
 instance FZip (Element a) where
     fzipWith f (Element x) (Element y) = Element (f x y)
 
@@ -307,6 +314,12 @@ instance FRepeat Limit where
     frepeat x = Limit x
 
 #if MIN_VERSION_base(4,9,0)
+instance Data.Semigroup.Semigroup a => FZip (Const a) where
+  fzipWith _ (Const a) (Const b) = Const (a <> b)
+
+instance (Monoid a, Semigroup a) => FRepeat (Const a) where
+  frepeat _ = Const mempty
+
 instance (FZip f, FZip g) => FZip (Product f g) where
   fzipWith f (Pair x y) (Pair x' y') = Pair (fzipWith f x x') (fzipWith f y y')
 
@@ -322,6 +335,21 @@ instance (Applicative f, FRepeat g) => FRepeat (Compose f g) where
 #endif
 
 #if MIN_VERSION_base(4,10,0)
+instance FZip U1 where
+  fzipWith _ _ _ =  U1
+
+instance FRepeat U1 where
+  frepeat _ = U1
+
+instance FZip V1 where
+  fzipWith _ x _ = case x of
+
+instance Data.Semigroup.Semigroup a => FZip (K1 i a) where
+  fzipWith _ (K1 a) (K1 b) = K1 (a <> b)
+
+instance (Monoid a, Semigroup a) => FRepeat (K1 i a) where
+  frepeat _ = K1 mempty
+
 instance (FZip f, FZip g) => FZip (f :*: g) where
   fzipWith f (x :*: y) (x' :*: y') = fzipWith f x x' :*: fzipWith f y y'
 
