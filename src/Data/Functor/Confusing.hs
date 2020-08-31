@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP        #-}
+{-# LANGUAGE PolyKinds  #-}
 {-# LANGUAGE RankNTypes #-}
 -- |
 -- Csongor Kiss, Matthew Pickering, and Nicolas Wu. 2018. Generic deriving of generic traversals.

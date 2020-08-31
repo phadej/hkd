@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE PolyKinds #-}
 module Main (
   main,
   Record (..),
@@ -48,8 +48,8 @@ instance FTraversable Cons where ftraverse = gftraverse
 -- Units
 -------------------------------------------------------------------------------
 
-data MyU1 (f :: Type -> Type) = MyU1 deriving Generic
-data MyV1 (f :: Type -> Type)        deriving Generic
+data MyU1 (f :: k -> Type) = MyU1 deriving Generic
+data MyV1 (f :: k -> Type)        deriving Generic
 
 instance FFunctor     MyU1 where ffmap     = ffmapDefault
 instance FFoldable    MyU1 where ffoldMap  = ffoldMapDefault

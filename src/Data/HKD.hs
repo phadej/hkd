@@ -538,7 +538,7 @@ instance FFoldable Limit where
 -- @
 
 gftraverse
-  :: forall t (f :: Type -> Type) (g :: Type -> Type) m. (Applicative m, Generic (t f), Generic (t g), GFTraversable (Curried (Yoneda m)) f g (Rep (t f)) (Rep (t g)))
+  :: forall t f g m. (Applicative m, Generic (t f), Generic (t g), GFTraversable (Curried (Yoneda m)) f g (Rep (t f)) (Rep (t g)))
   => (forall a. f a -> m (g a))
   -> t f
   -> m (t g)
@@ -615,7 +615,7 @@ instance (f ~ f', g ~ g', t ~ t', i ~ R, i' ~ R, Applicative m, FTraversable t) 
 -- @
 
 gfzipWith
-  :: forall t (f :: Type -> Type) (g :: Type -> Type) (h :: Type -> Type). (Generic (t f), Generic (t g), Generic (t h), GFZip f g h (Rep (t f)) (Rep (t g)) (Rep (t h)))
+  :: forall t f g h. (Generic (t f), Generic (t g), Generic (t h), GFZip f g h (Rep (t f)) (Rep (t g)) (Rep (t h)))
   => (forall a. f a -> g a -> h a)
   -> t f
   -> t g
@@ -665,7 +665,7 @@ instance (f ~ f', g ~ g', h ~ h', t0 ~ t1, t1 ~ t2, i0 ~ R, i1 ~ R, i2 ~ R, FZip
 -------------------------------------------------------------------------------
 
 gfrepeat
-  :: forall t (f :: Type -> Type). (Generic (t f), GFRepeat f (Rep (t f)))
+  :: forall t f. (Generic (t f), GFRepeat f (Rep (t f)))
   => (forall x. f x)
   -> t f
 gfrepeat x = to (gfrepeat0 x)
