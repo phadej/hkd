@@ -548,14 +548,14 @@ gftraverse = fconfusing impl
   impl nt = fmap to . gftraverse0 nt . from
 {-# INLINE gftraverse #-}
 
-class GFTraversable m f g tf tg where
+class GFTraversable m (f :: k -> Type) (g :: k -> Type) tf tg where
   gftraverse0 :: (forall a. f a -> m (g a)) -> tf () -> m (tg ())
 
 instance (i ~ D, i' ~ D, Functor m, GFTraversable1 m f g h h') => GFTraversable m f g (M1 i c h) (M1 i' c' h') where
   gftraverse0 nt = fmap M1 . gftraverse1 nt . unM1
   {-# INLINE gftraverse0 #-}
 
-class GFTraversable1 m f g tf tg where
+class GFTraversable1 m (f :: k -> Type) (g :: k -> Type) tf tg where
   gftraverse1 :: (forall a. f a -> m (g a)) -> tf () -> m (tg ())
 
 instance GFTraversable1 m f g V1 V1 where
@@ -574,7 +574,7 @@ instance (i ~ C, i' ~ C, Functor m, GFTraversable2 m f g h h') => GFTraversable1
 class GFTraversable2 m f g tf tg where
   gftraverse2 :: (forall a. f a -> m (g a)) -> tf () -> m (tg ())
 
-instance Applicative m  => GFTraversable2 m f g U1 U1 where
+instance Applicative m  => GFTraversable2 m (f :: k -> Type) (g :: k -> Type) U1 U1 where
   gftraverse2 _ _ = pure U1
   {-# INLINE gftraverse2 #-}
 
@@ -623,14 +623,14 @@ gfzipWith
 gfzipWith nt x y = to (gfzipWith0 nt (from x) (from y))
 {-# INLINE gfzipWith #-}
 
-class GFZip f g h tf tg th where
+class GFZip (f :: k -> Type) (g :: k -> Type) (h :: k -> Type) tf tg th where
   gfzipWith0 :: (forall a. f a -> g a -> h a) -> tf () -> tg () -> th ()
 
 instance (i0 ~ D, i1 ~ D, i2 ~ D, GFZip1 f g h t0 t1 t2) => GFZip f g h (M1 i0 c0 t0) (M1 i1 c1 t1) (M1 i2 c2 t2) where
   gfzipWith0 nt x y = M1 (gfzipWith1 nt (unM1 x) (unM1 y))
   {-# INLINE gfzipWith0 #-}
 
-class GFZip1 f g h tf tg th where
+class GFZip1 (f :: k -> Type) (g :: k -> Type) h tf tg th where
   gfzipWith1 :: (forall a. f a -> g a -> h a) -> tf () -> tg () -> th ()
 
 instance GFZip1 f g h V1 V1 V1 where
@@ -640,7 +640,7 @@ instance (i0 ~ C, i1 ~ C, i2 ~ C, GFZip2 f g h t0 t1 t2) => GFZip1 f g h (M1 i0 
   gfzipWith1 nt x y = M1 (gfzipWith2 nt (unM1 x) (unM1 y))
   {-# INLINE gfzipWith1 #-}
 
-class GFZip2 f g h tf tg th where
+class GFZip2 (f :: k -> Type) (g :: k -> Type) (h :: k -> Type) tf tg th where
   gfzipWith2 :: (forall a. f a -> g a -> h a) -> tf () -> tg () -> th ()
 
 instance GFZip2 f g h U1 U1 U1 where
@@ -670,19 +670,19 @@ gfrepeat
   -> t f
 gfrepeat x = to (gfrepeat0 x)
 
-class GFRepeat f tf where
+class GFRepeat (f :: k -> Type) tf where
   gfrepeat0 :: (forall a. f a) -> tf ()
 
 instance (i ~ D, GFRepeat1 g f) => GFRepeat g (M1 i c f) where
   gfrepeat0 x = M1 (gfrepeat1 x)
 
-class GFRepeat1 f tf where
+class GFRepeat1 (f :: k -> Type) tf where
   gfrepeat1 :: (forall a. f a) -> tf ()
 
 instance (i ~ C, GFRepeat2 g f) => GFRepeat1 g (M1 i c f) where
   gfrepeat1 x = M1 (gfrepeat2 x)
 
-class GFRepeat2 f tf where
+class GFRepeat2 (f :: k -> Type) tf where
   gfrepeat2 :: (forall a. f a) -> tf ()
 
 instance (i ~ S, GFRepeat2 g f) => GFRepeat2 g (M1 i c f) where

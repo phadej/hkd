@@ -1,6 +1,6 @@
 cabal-version:   2.2
 name:            hkd
-version:         0.1
+version:         0.2
 x-revision:      3
 synopsis:        "higher-kinded data"
 description:
