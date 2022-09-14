@@ -98,3 +98,14 @@ test-suite example-record
     , base
     , hkd
     , some
+
+test-suite example-issue-12
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  ghc-options:      -Wall
+  hs-source-dirs:   example
+  main-is:          example-issue-12.hs 
+
+  build-depends:
+    , base
+    , hkd
