@@ -1,7 +1,6 @@
 cabal-version:   2.2
 name:            hkd
-version:         0.1
-x-revision:      4
+version:         0.2
 synopsis:        "higher-kinded data"
 description:
   "Higher-kinded data" utilities, e.g.
@@ -39,7 +38,7 @@ tested-with:
    || ==8.10.7
    || ==9.0.2
    || ==9.2.4
-   || ==9.4.1
+   || ==9.4.2
 
 source-repository head
   type:     git
