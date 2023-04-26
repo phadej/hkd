@@ -1,6 +1,7 @@
 cabal-version:   2.2
 name:            hkd
 version:         0.2
+x-revision:      1
 synopsis:        "higher-kinded data"
 description:
   "Higher-kinded data" utilities, e.g.
@@ -37,8 +38,9 @@ tested-with:
    || ==8.8.4
    || ==8.10.7
    || ==9.0.2
-   || ==9.2.4
-   || ==9.4.2
+   || ==9.2.7
+   || ==9.4.5
+   || ==9.6.1
 
 source-repository head
   type:     git
@@ -61,11 +63,11 @@ library
       -Wredundant-constraints -Widentities -Wmissing-export-lists
 
   build-depends:
-    , base  >=4.6     && <4.18
+    , base  >=4.6     && <4.19
     , some  ^>=1.0.0.3
 
   if !impl(ghc >=7.10)
-    build-depends: transformers >=0.3 && <0.6
+    build-depends: transformers >=0.3 && <0.7
 
   if !impl(ghc >=8.0)
     build-depends: semigroups >=0.18.5 && <1
