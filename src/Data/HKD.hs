@@ -449,6 +449,20 @@ instance FFunctor (Tab a) where
 -- | Element in @f@
 newtype Element a f = Element { runElement :: f a }
 
+-- |
+--
+-- @since 0.2.1
+--
+instance Eq (f a) => Eq (Element a f) where
+  Element x == Element y = x == y
+
+-- |
+--
+-- @since 0.2.1
+--
+instance Show (f a) => Show (Element a f) where
+  showsPrec d (Element x) = showParen (d > 10) $ showString "Element " . showsPrec 11 x
+
 instance FFunctor (Element a) where
   ffmap f (Element fa) = Element (f fa)
 
